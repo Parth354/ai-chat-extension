@@ -1,0 +1,90 @@
+{
+  "name": "ai-chat-sidebar",
+  "displayName": "AI Chat Sidebar",
+  "description": "An AI-powered chat assistant for VS Code with React UI",
+  "version": "1.0.0",
+  "publisher": "your-publisher-name",
+  "engines": {
+    "vscode": "^1.80.0"
+  },
+  "activationEvents": [
+    "onView:aiChatSidebarView",
+    "onCommand:aiChatSidebar.testConnection"
+  ],
+  "main": "./out/extension.js",
+  "contributes": {
+    "viewsContainers": {
+      "activitybar": [
+        {
+          "id": "aiChatSidebarContainer",
+          "title": "AI Chat",
+          "icon": "comment-discussion"
+        }
+      ]
+    },
+    "views": {
+      "aiChatSidebarContainer": [
+        {
+          "icon": "icon.svg",
+          "id": "aiChatSidebarView",
+          "name": "AI Chat Assistant",
+          "type": "webview", 
+          "when": "true"
+        }
+      ]
+    },
+    "commands": [
+      {
+        "command": "aiChatSidebar.testConnection",
+        "title": "Test OpenAI Connection",
+        "category": "AI Chat"
+      }
+    ],
+    "configuration": {
+      "type": "object",
+      "title": "AI Chat Settings",
+      "properties": {
+        "aiChat.openaiApiKey": {
+          "type": "string",
+          "default": "",
+          "description": "Your OpenAI API Key (required for AI functionality)",
+          "markdownDescription": "Your OpenAI API Key. You can get one from [OpenAI](https://platform.openai.com/account/api-keys).",
+          "scope": "resource",
+          "restricted": true
+        },
+        "aiChat.model": {
+          "type": "string",
+          "default": "gpt-4",
+          "enum": ["gpt-4", "gpt-4-turbo", "gpt-3.5-turbo"],
+          "description": "OpenAI model to use",
+          "scope": "resource"
+        },
+        "aiChat.maxTokens": {
+          "type": "number",
+          "default": 2048,
+          "minimum": 100,
+          "maximum": 4096,
+          "description": "Maximum tokens for response",
+          "scope": "resource"
+        }
+      }
+    }
+  },
+  "scripts": {
+    "compile": "tsc -p ./",
+    "watch": "tsc -watch -p ./",
+    "vscode:prepublish": "npm run compile",
+    "pretest": "npm run compile",
+    "test": "node ./out/test/runTests.js",
+    "build": "node scripts/build.js"
+  },
+  "devDependencies": {
+    "@types/node": "^20.0.0",
+    "@types/node-fetch": "^2.6.12",
+    "@types/vscode": "^1.80.0",
+    "typescript": "^5.1.6"
+  },
+  "dependencies": {
+    "node-fetch": "^2.6.7"
+  }
+}
