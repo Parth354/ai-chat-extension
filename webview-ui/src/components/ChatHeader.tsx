@@ -1,7 +1,8 @@
 import React from 'react';
+import { IRegisteredProviderConfig } from '../types';
 
 interface Props {
-  availableProviders: { providerId: string; providerName: string; models: { id: string; name: string }[] }[];
+  availableProviders: IRegisteredProviderConfig[];
   selectedProviderId: string;
   selectedModelId: string;
   setSelectedProviderId: (id: string) => void;
@@ -11,7 +12,7 @@ interface Props {
   requestSettings: () => void;
 }
 
-const ChatHeader: React.FC<Props> = ({
+export default function ChatHeader({
   availableProviders,
   selectedProviderId,
   selectedModelId,
@@ -19,54 +20,63 @@ const ChatHeader: React.FC<Props> = ({
   setSelectedModelId,
   showErrorModal,
   retryCount,
-  requestSettings,
-}) => {
-  const currentProvider = availableProviders.find(p => p.providerId === selectedProviderId);
-  const models = currentProvider?.models || [];
+  requestSettings
+}: Props) {
+  const current = availableProviders.find((p) => p.providerId === selectedProviderId);
+
+  const handleProviderChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
+    const newProviderId = e.target.value;
+    setSelectedProviderId(newProviderId);
+
+    const newProvider = availableProviders.find((p) => p.providerId === newProviderId);
+    if (newProvider && newProvider.models.length > 0) {
+      setSelectedModelId(newProvider.models[0].id);
+    } else {
+      setSelectedModelId('');
+    }
+  };
 
   return (
-    <div className="app-header">
-      <h2>AI Chat Assistant</h2>
-      <div className="model-selection">
-        <label htmlFor="provider">Provider:</label>
-        <select
-          className="model-select"
-          id="provider"
-          value={selectedProviderId}
-          onChange={(e) => setSelectedProviderId(e.target.value)}
-        >
-          {availableProviders.map(p => (
-            <option key={p.providerId} value={p.providerId}>{p.providerName}</option>
-          ))}
-        </select>
+    <header className="flex flex-col gap-2 md:flex-row md:items-center md:justify-between px-4 py-2 bg-[var(--vscode-sideBar-background)] border-b border-[var(--vscode-editorWidget-border)]">
+      <div className="flex flex-col md:flex-row md:items-center md:space-x-2 gap-1 md:gap-0">
+        <div className="flex flex-col md:flex-row md:items-center gap-1 md:gap-2">
+          <label className="text-sm md:mb-0">Provider:</label>
+          <select
+            value={selectedProviderId}
+            onChange={handleProviderChange}
+            className="bg-[var(--vscode-input-background)] text-[var(--vscode-input-foreground)] border border-[var(--vscode-input-border)] rounded px-2 py-1 text-sm"
+          >
+            {availableProviders.map((p) => (
+              <option key={p.providerId} value={p.providerId}>
+                {p.providerName}
+              </option>
+            ))}
+          </select>
+        </div>
 
-        <label htmlFor="model">Model:</label>
-        <select
-          className="model-select"
-          id="model"
-          value={selectedModelId}
-          onChange={(e) => setSelectedModelId(e.target.value)}
-        >
-          {models.map(m => (
-            <option key={m.id} value={m.id}>{m.name}</option>
-          ))}
-        </select>
+        <div className="flex flex-col md:flex-row md:items-center gap-1 md:gap-2 mt-2 md:mt-0">
+          <label className="text-sm md:mb-0">Model:</label>
+          <select
+            value={selectedModelId}
+            onChange={(e) => setSelectedModelId(e.target.value)}
+            className="bg-[var(--vscode-input-background)] text-[var(--vscode-input-foreground)] border border-[var(--vscode-input-border)] rounded px-2 py-1 text-sm"
+          >
+            {current?.models.map((m) => (
+              <option key={m.id} value={m.id}>
+                {m.name}
+              </option>
+            ))}
+          </select>
+        </div>
       </div>
 
-      {showErrorModal && (
-        <div className="error-modal">
-          <div className="error-modal-content">
-            <h3>⚠️ Could not load models</h3>
-            <p>Attempt {retryCount + 1} / 3</p>
-            <div className="error-modal-buttons">
-              <button className="error-modal-retry-button" onClick={requestSettings}>Retry</button>
-              <button className="error-modal-close-button" onClick={() => window.location.reload()}>Close</button>
-            </div>
-          </div>
-        </div>
-      )}
-    </div>
+      <div className="text-xs text-right mt-2 md:mt-0">
+        {showErrorModal && <span className="text-red-500 mr-2">Error fetching settings.</span>}
+        {retryCount > 0 && <span className="text-yellow-400 mr-2">Retry: {retryCount}</span>}
+        <button onClick={requestSettings} className="underline text-sm hover:opacity-80">
+          Retry
+        </button>
+      </div>
+    </header>
   );
-};
-
-export default ChatHeader;
+}

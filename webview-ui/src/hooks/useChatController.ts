@@ -1,105 +1,182 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useEffect, useState } from 'react';
 import { ChatMessage, VSCodeAPI, WebviewMessage, IRegisteredProviderConfig } from '../types';
+import { v4 as uuidv4 } from 'uuid';
 
 export default function useChatController(vscode: VSCodeAPI) {
-  const [messages, setMessages] = useState<ChatMessage[]>(() => vscode.getState()?.messages || []);
+  const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [isLoading, setIsLoading] = useState(false);
-  const [attachedFiles, setAttachedFiles] = useState<string[]>([]);
-  const [availableProviders, setAvailableProviders] = useState<IRegisteredProviderConfig[]>([]);
-  const [selectedProviderId, setSelectedProviderId] = useState<string>('');
-  const [selectedModelId, setSelectedModelId] = useState<string>('');
   const [showErrorModal, setShowErrorModal] = useState(false);
-  const [errorMessage, setErrorMessage] = useState<string>('');
+  const [errorMessage, setErrorMessage] = useState('');
+  const [availableProviders, setAvailableProviders] = useState<IRegisteredProviderConfig[]>([]);
+  const [selectedProviderId, setSelectedProviderId] = useState<string | null>(null);
+  const [selectedModelId, setSelectedModelId] = useState<string | null>(null);
   const [retryCount, setRetryCount] = useState(0);
-
-  const requestSettings = useCallback(() => {
-    vscode.postMessage({ type: 'requestSettings' });
-    setRetryCount(prev => prev + 1);
-  }, [vscode]);
+  const [attachedFiles, setAttachedFiles] = useState<Record<string, string>>({});
+  const [pendingSend, setPendingSend] = useState<string | null>(null);
 
   useEffect(() => {
-    requestSettings();
-    const timeout = setTimeout(requestSettings, 1000);
-    return () => clearTimeout(timeout);
-  }, [requestSettings]);
+    const listener = (event: MessageEvent<WebviewMessage>) => {
+      const message = event.data;
 
-  useEffect(() => {
-    const handler = (event: MessageEvent) => {
-      const msg: WebviewMessage = event.data;
+      switch (message.type) {
+        case 'settingsUpdate':
+          if (message.settings) {
+            const { availableModels, defaultModelProvider } = message.settings;
+            setAvailableProviders(availableModels);
+            setSelectedProviderId(defaultModelProvider);
+            const defaultProvider = availableModels.find(p => p.providerId === defaultModelProvider);
+            if (defaultProvider) {
+              setSelectedModelId(defaultProvider.defaultModelId);
+            }
+          }
+          break;
 
-      if (msg.type === 'settingsUpdate' && msg.settings?.availableModels?.length) {
-        const settings = msg.settings;
-        setAvailableProviders(settings.availableModels);
-        const provider = settings.availableModels.find(p => p.providerId === settings.defaultModelProvider) || settings.availableModels[0];
-        setSelectedProviderId(provider.providerId);
-        const model = settings[`${provider.providerId}Model`] || provider.defaultModelId || provider.models[0]?.id || '';
-        setSelectedModelId(model);
-        setShowErrorModal(false);
-        setErrorMessage('');
-      }
+        case 'attachedFileContent': {
+          const { fileName, content } = message;
+          if (typeof fileName === 'string' && typeof content === 'string') {
+            setAttachedFiles(prev => {
+              const updated: Record<string, string> = { ...prev, [fileName]: content };
+              if (pendingSend && areAllMentionsAvailable(pendingSend, updated)) {
+                sendExpandedMessage(pendingSend, updated);
+                setPendingSend(null);
+              }
+              return updated;
+            });
+          }
+          break;
+        }
 
-      if (msg.type === 'response' && msg.text) {
-        const aiMsg: ChatMessage = { id: Date.now().toString(), type: 'assistant', content: msg.text, timestamp: new Date().toISOString() };
-        setMessages(m => [...m, aiMsg]);
-        setIsLoading(false);
-      }
+        case 'response':
+          if (message.text) {
+            const newMsg: ChatMessage = {
+              id: uuidv4(),
+              type: 'assistant',
+              content: message.text,
+              timestamp: new Date().toISOString(),
+            };
+            setMessages(prev => [...prev, newMsg]);
+            setIsLoading(false);
+          }
+          break;
 
-      if (msg.type === 'error' || msg.type === 'apiError') {
-        const backendError = typeof msg.message === 'string' ? msg.message : 'An unknown error occurred.';
-        setShowErrorModal(true);
-        setErrorMessage(backendError);
-        setIsLoading(false);
-        setRetryCount(prev => prev + 1);
+        case 'error':
+          if (message.error?.message) {
+            setErrorMessage(message.error.message);
+            setShowErrorModal(true);
+            setIsLoading(false);
+          }
+          break;
       }
     };
 
-    window.addEventListener('message', handler);
-    return () => window.removeEventListener('message', handler);
-  }, []);
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'visible') {
+        requestSettings();
+      }
+    };
 
-  useEffect(() => {
-    vscode.setState({ messages });
-  }, [messages, vscode]);
+    window.addEventListener('message', listener);
+    document.addEventListener('visibilitychange', handleVisibilityChange);
 
-  const handleSendMessage = useCallback((content: string) => {
-    if (!content.trim() || !selectedProviderId || !selectedModelId) return;
+    // Delay to prevent race condition
+    const timeout = setTimeout(() => {
+      requestSettings();
+    }, 50);
 
-    setIsLoading(true);
-    const userMsg: ChatMessage = { id: Date.now().toString(), type: 'user', content: content.trim(), timestamp: new Date().toISOString() };
-    setMessages(m => [...m, userMsg]);
+    return () => {
+      window.removeEventListener('message', listener);
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+      clearTimeout(timeout);
+    };
+  }, [pendingSend]);
 
-    vscode.postMessage({
-      type: 'sendMessage',
-      text: content.trim(),
-      context: { attachedFiles },
-      modelProvider: selectedProviderId,
-      modelName: selectedModelId
+  const requestSettings = () => {
+    vscode.postMessage({ type: 'requestSettings' });
+  };
+
+  const extractMentions = (text: string): string[] => {
+    const matches = [...text.matchAll(/@([\w./-]+)/g)];
+    return matches.map(m => m[1]);
+  };
+
+  const areAllMentionsAvailable = (text: string, fileMap: Record<string, string>) => {
+    return extractMentions(text).every(name => fileMap[name]);
+  };
+
+  const expandAtMentions = (text: string, fileMap: Record<string, string>): string => {
+    return text.replace(/@([\w./-]+)/g, (match, fileName) => {
+      const content = fileMap[fileName];
+      return content
+        ? `\n\n--- Begin file: ${fileName} ---\n${content}\n--- End file: ${fileName} ---\n\n`
+        : match;
     });
-  }, [selectedProviderId, selectedModelId, attachedFiles, vscode]);
+  };
+
+  const sendExpandedMessage = (rawText: string, fileMap: Record<string, string>) => {
+    const expandedText = expandAtMentions(rawText, fileMap);
+
+    const userMessage: ChatMessage = {
+      id: uuidv4(),
+      type: 'user',
+      content: expandedText,
+      timestamp: new Date().toISOString(),
+    };
+
+    setMessages(prev => [...prev, userMessage]);
+    setIsLoading(true);
+
+    const message: WebviewMessage = {
+      type: 'sendMessage',
+      text: expandedText,
+      modelProvider: selectedProviderId!,
+      modelName: selectedModelId!,
+    };
+
+    vscode.postMessage(message);
+  };
+
+  const handleSendMessage = (text: string) => {
+    const trimmed = text.trim();
+    if (!trimmed || !selectedProviderId || !selectedModelId) return;
+
+    const mentions = extractMentions(trimmed);
+    const missing = mentions.filter(m => !attachedFiles[m]);
+
+    if (missing.length > 0) {
+      missing.forEach(name => {
+        vscode.postMessage({
+          type: 'requestFileContent',
+          fileName: name,
+          modelProvider: selectedProviderId,
+          modelName: selectedModelId,
+          originalMessage: trimmed,
+        });
+      });
+      setPendingSend(trimmed);
+      return;
+    }
+
+    sendExpandedMessage(trimmed, attachedFiles);
+  };
 
   const handleClearMessages = () => {
     setMessages([]);
-    vscode.setState({ messages: [] });
   };
 
   return {
     messages,
     isLoading,
-    attachedFiles,
+    handleSendMessage,
+    handleClearMessages,
+    showErrorModal,
+    setShowErrorModal,
+    errorMessage,
+    retryCount,
     availableProviders,
     selectedProviderId,
     selectedModelId,
-    showErrorModal,
-    errorMessage,
-    retryCount,
     setSelectedProviderId,
     setSelectedModelId,
-    setShowErrorModal,
-    setAttachedFiles,
-    setMessages,
-    setIsLoading,
-    handleSendMessage,
-    handleClearMessages,
     requestSettings,
   };
 }

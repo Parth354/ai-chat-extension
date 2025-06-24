@@ -15,21 +15,21 @@ export default class GeminiService implements IAIModelService {
         return apiKey;
     }
 
-    public getAvailableModels(): Array<{ id: string; name: string; }> {
+    public getAvailableModels(): Array<{ id: string; name: string }> {
         return [
-            { id: 'gemini-pro', name: 'Gemini Pro (Free Tier)' }, 
-            { id: 'gemini-1.5-pro-latest', name: 'Gemini 1.5 Pro (Latest)' }, 
-            { id: 'gemini-1.0-pro', name: 'Gemini 1.0 Pro' } 
+            { id: 'gemini-2.0-flash', name: 'Gemini 2.0 Flash (Stable)' },
+            { id: 'gemini-pro', name: 'Gemini Pro (Free Tier)' },
+            { id: 'gemini-1.5-pro-latest', name: 'Gemini 1.5 Pro (Latest)' },
+            { id: 'gemini-1.0-pro', name: 'Gemini 1.0 Pro' }
         ];
     }
 
     async sendMessage(message: string, context?: ChatContext, model?: string): Promise<string> {
         const apiKey = this.getApiKey();
-        const modelToUse = model || vscode.workspace.getConfiguration('aiChat').get('geminiModel', 'gemini-pro');
+        const modelToUse = model || 'gemini-2.0-flash'; // default fallback
         const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/${modelToUse}:generateContent?key=${apiKey}`;
 
         let contents: Array<{ role: string; parts: Array<{ text: string }> }> = [];
-
         let userContentParts: Array<{ text: string }> = [{ text: message }];
 
         if (context?.attachedFiles && context.attachedFiles.length > 0) {
@@ -62,13 +62,14 @@ export default class GeminiService implements IAIModelService {
         });
 
         if (!response.ok) {
-            const errorData = await response.json();
+            const errorData = await response.json().catch(() => ({}));
             console.error('❌ [gemini] Gemini API Error:', errorData);
-            throw new Error(`Gemini API error: ${response.status} - ${errorData.error?.message || JSON.stringify(errorData) || response.statusText}`);
+            throw new Error(`Gemini API error: ${response.status} - ${errorData.error?.message || response.statusText}`);
         }
 
         const data = await response.json();
         console.log('✅ [gemini] Response received:', data);
+
         return data?.candidates?.[0]?.content?.parts?.[0]?.text ?? 'No response from Gemini AI.';
     }
 }

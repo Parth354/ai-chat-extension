@@ -1,10 +1,12 @@
 import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react';
 import { resolve } from 'path';
+import tailwindcss from '@tailwindcss/vite'
 
 export default defineConfig({
   base: './',
-  plugins: [react()],
+  plugins: [react(),
+  tailwindcss()],
   build: {
     outDir: resolve(__dirname, '../media'),
     emptyOutDir: true,

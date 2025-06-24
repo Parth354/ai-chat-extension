@@ -1,40 +1,29 @@
+// src/components/MessageBubble.tsx
 import React from 'react';
-import ReactMarkdown from 'react-markdown';
 import { ChatMessage } from '../types';
+import AssistantMessageBubble from './AssistantMessageBubble';
 
-interface MessageBubbleProps {
+interface Props {
   message: ChatMessage;
 }
 
-const MessageBubble: React.FC<MessageBubbleProps> = ({ message }) => {
-  return (
-    <div className={`message-bubble ${message.type}`}>
-      <div className="message-header">
-        <span className="message-author">
-          {message.type === 'user' ? 'You' : 'AI Assistant'}
-        </span>
-        <span className="message-time">
-          {new Date(message.timestamp).toLocaleTimeString()}
-        </span>
-      </div>
+const MessageBubble = ({ message }: Props) => {
+  const isUser = message.type === 'user';
 
-      <div className="message-content">
-        <ReactMarkdown
-          components={{
-            code({ inline, className, children, ...props }: any) {
-              if (inline) {
-                return <code className={className}>{children}</code>;
-              }
-              return (
-                <pre className={className}>
-                  <code>{children}</code>
-                </pre>
-              );
-            },
-          }}
-        >
-          {message.content}
-        </ReactMarkdown>
+  return (
+    <div className={`flex ${isUser ? 'justify-end' : 'justify-start'}`}>
+      <div
+        className={`max-w-[80%] px-4 py-2 rounded-md text-sm whitespace-pre-wrap ${
+          isUser
+            ? 'bg-[var(--vscode-editor-background)] text-[var(--vscode-editor-foreground)]'
+            : ''
+        }`}
+      >
+        {isUser ? (
+          <span>{message.content}</span>
+        ) : (
+          <AssistantMessageBubble message={message} />
+        )}
       </div>
     </div>
   );

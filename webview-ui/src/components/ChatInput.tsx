@@ -1,47 +1,44 @@
-import React, { useState, useCallback } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 
 interface ChatInputProps {
-  onSendMessage: (message: string) => void;
-  disabled: boolean;
+  onSend: (text: string) => void;
 }
 
-const ChatInput: React.FC<ChatInputProps> = ({ onSendMessage, disabled }) => {
-  const [message, setMessage] = useState('');
+const ChatInput: React.FC<ChatInputProps> = ({ onSend }) => {
+  const [text, setText] = useState('');
+  const inputRef = useRef<HTMLTextAreaElement>(null);
 
-  const handleSubmit = useCallback((e: React.FormEvent) => {
-    e.preventDefault();
-    if (message.trim() && !disabled) {
-      onSendMessage(message.trim());
-      setMessage('');
-    }
-  }, [message, disabled, onSendMessage]);
+  useEffect(() => {
+    inputRef.current?.focus();
+  }, []);
 
-  const handleKeyDown = useCallback((e: React.KeyboardEvent) => {
+  const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
     if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault();
-      handleSubmit(e as any);
+      const trimmed = text.trim();
+      if (trimmed) {
+        try {
+          onSend(trimmed);
+          setText('');
+        } catch (err) {
+          console.error('Error sending message:', err);
+        }
+      }
     }
-  }, [handleSubmit]);
+  };
 
   return (
-    <form onSubmit={handleSubmit} className="chat-input-form">
+    <div className="p-2">
       <textarea
-        value={message}
-        onChange={(e) => setMessage(e.target.value)}
+        ref={inputRef}
+        value={text}
+        onChange={(e) => setText(e.target.value)}
         onKeyDown={handleKeyDown}
-        placeholder="Ask me anything..."
-        disabled={disabled}
+        placeholder="Type your message..."
+        className="w-full resize-none rounded-md bg-[var(--vscode-input-background)] p-2 text-sm text-[var(--vscode-input-foreground)] shadow-sm border border-[var(--vscode-input-border)] focus:outline-none focus:ring"
         rows={2}
-        className="message-input"
       />
-      <button
-        type="submit"
-        disabled={disabled || !message.trim()}
-        className="send-button"
-      >
-        {disabled ? '...' : 'Send'}
-      </button>
-    </form>
+    </div>
   );
 };
 
