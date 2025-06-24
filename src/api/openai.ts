@@ -1,8 +1,11 @@
 import * as vscode from 'vscode';
 import fetch from 'node-fetch';
-import { ChatContext } from '../context/workspaceContext'; // Import ChatContext
+import { ChatContext } from '../context/workspaceContext';
+import { IAIModelService } from './iaimodel';
 
-export class OpenAIService {
+export default class OpenAIService implements IAIModelService {
+    public readonly providerId: string = 'openai';
+
     private getApiKey(): string {
         const config = vscode.workspace.getConfiguration('aiChat');
         const apiKey = config.get<string>('openaiApiKey');
@@ -12,37 +15,36 @@ export class OpenAIService {
         return apiKey;
     }
 
-    async sendMessage(message: string, context?: ChatContext): Promise<string> {
-        const apiKey = this.getApiKey();
+    public getAvailableModels(): Array<{ id: string; name: string; }> {
+        return [
+            { id: 'gpt-3.5-turbo', name: 'GPT-3.5 Turbo' },
+            { id: 'gpt-4o', name: 'GPT-4o' },
+            { id: 'gpt-4o-mini', name: 'GPT-4o Mini' }
+        ];
+    }
 
-        // Prepare messages for the AI
+    async sendMessage(message: string, context?: ChatContext, model?: string): Promise<string> {
+        const apiKey = this.getApiKey();
+        
+        const modelToUse = model || vscode.workspace.getConfiguration('aiChat').get('openaiModel', 'gpt-3.5-turbo');
+
         let promptMessages: { role: 'system' | 'user'; content: string }[] = [
             { role: 'system', content: 'You are an AI assistant integrated in VS Code. Provide concise and helpful code-related answers. If code is provided, analyze it.' },
         ];
 
-        // Append context to the user's message or as a separate system message
         let userMessageContent = message;
 
-        if (context) {
-            if (context.activeFileContent) {
-                userMessageContent = `File: ${context.fileName || 'Active File'}\n\`\`\`${context.language || ''}\n${context.activeFileContent}\n\`\`\`\n\n${userMessageContent}`;
-            }
-            if (context.selectedText) {
-                userMessageContent = `Selected Code:\n\`\`\`${context.language || ''}\n${context.selectedText}\n\`\`\`\n\n${userMessageContent}`;
-            }
-            if (context.attachedFiles && context.attachedFiles.length > 0) {
-                const attachedFileDetails = context.attachedFiles.map(file => 
-                    `--- ${file.name} ---\n\`\`\`\n${file.content}\n\`\`\``
-                ).join('\n\n');
-                userMessageContent = `${attachedFileDetails}\n\n${userMessageContent}`;
-            }
+        if (context?.attachedFiles && context.attachedFiles.length > 0) {
+            const attachedFileDetails = context.attachedFiles.map(file =>
+                `--- ${file.name} ---\n\`\`\`\n${file.content}\n\`\`\``
+            ).join('\n\n');
+            userMessageContent = `${attachedFileDetails}\n\n${userMessageContent}`;
         }
 
         promptMessages.push({ role: 'user', content: userMessageContent });
 
-
         const payload = {
-            model: vscode.workspace.getConfiguration('aiChat').get('model', 'gpt-4'),
+            model: modelToUse,
             messages: promptMessages,
             max_tokens: vscode.workspace.getConfiguration('aiChat').get('maxTokens', 2048)
         };

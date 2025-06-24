@@ -1,7 +1,5 @@
 import React from 'react';
 import ReactMarkdown from 'react-markdown';
-import SyntaxHighlighter from 'react-syntax-highlighter/dist/esm/prism';
-import { vscDarkPlus, vs } from 'react-syntax-highlighter/dist/esm/styles/prism';
 import { ChatMessage } from '../types';
 
 interface MessageBubbleProps {
@@ -9,8 +7,6 @@ interface MessageBubbleProps {
 }
 
 const MessageBubble: React.FC<MessageBubbleProps> = ({ message }) => {
-  const isDark = document.body.dataset.vscodeThemeKind === 'vscode-dark';
-
   return (
     <div className={`message-bubble ${message.type}`}>
       <div className="message-header">
@@ -25,35 +21,16 @@ const MessageBubble: React.FC<MessageBubbleProps> = ({ message }) => {
       <div className="message-content">
         <ReactMarkdown
           components={{
-            code(props) {
-              const { inline, className, children, ...rest } = props as {
-                inline?: boolean;
-                className?: string;
-                children: React.ReactNode;
-              };
-
-              const match = /language-(\w+)/.exec(className || '');
-              const language = match?.[1];
-
-              if (!inline && language) {
-                return (
-                  <SyntaxHighlighter
-                    style={isDark ? vscDarkPlus : vs}
-                    language={language}
-                    PreTag="div"
-                    {...rest}
-                  >
-                    {String(children).replace(/\n$/, '')}
-                  </SyntaxHighlighter>
-                );
+            code({ inline, className, children, ...props }: any) {
+              if (inline) {
+                return <code className={className}>{children}</code>;
               }
-
               return (
-                <code className={className} {...rest}>
-                  {children}
-                </code>
+                <pre className={className}>
+                  <code>{children}</code>
+                </pre>
               );
-            }
+            },
           }}
         >
           {message.content}

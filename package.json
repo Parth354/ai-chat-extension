@@ -1,90 +1,122 @@
 {
   "name": "ai-chat-sidebar",
   "displayName": "AI Chat Sidebar",
-  "description": "An AI-powered chat assistant for VS Code with React UI",
-  "version": "1.0.0",
-  "publisher": "your-publisher-name",
+  "description": "A VS Code extension for AI chat with model selection and context awareness.",
+  "version": "0.0.1",
+  "publisher": "YourPublisherName",
   "engines": {
-    "vscode": "^1.80.0"
+    "vscode": "^1.86.0"
   },
+  "categories": [
+    "Other"
+  ],
   "activationEvents": [
-    "onView:aiChatSidebarView",
-    "onCommand:aiChatSidebar.testConnection"
+    "onStartupFinished"
   ],
   "main": "./out/extension.js",
   "contributes": {
+    "commands": [
+      {
+        "command": "ai-chat-sidebar.start",
+        "title": "Start AI Chat"
+      }
+    ],
     "viewsContainers": {
       "activitybar": [
         {
-          "id": "aiChatSidebarContainer",
+          "id": "ai-chat-view",
           "title": "AI Chat",
-          "icon": "comment-discussion"
+          "icon": "$(comment-discussion)"
         }
       ]
     },
     "views": {
-      "aiChatSidebarContainer": [
+      "ai-chat-view": [
         {
+          "type": "webview",
           "icon": "icon.svg",
           "id": "aiChatSidebarView",
-          "name": "AI Chat Assistant",
-          "type": "webview", 
-          "when": "true"
+          "name": "AI Chat"
         }
       ]
     },
-    "commands": [
-      {
-        "command": "aiChatSidebar.testConnection",
-        "title": "Test OpenAI Connection",
-        "category": "AI Chat"
-      }
-    ],
     "configuration": {
-      "type": "object",
-      "title": "AI Chat Settings",
+      "title": "AI Chat Extension Configuration",
       "properties": {
         "aiChat.openaiApiKey": {
           "type": "string",
-          "default": "",
-          "description": "Your OpenAI API Key (required for AI functionality)",
-          "markdownDescription": "Your OpenAI API Key. You can get one from [OpenAI](https://platform.openai.com/account/api-keys).",
+          "description": "Your OpenAI API Key.",
+          "markdownDescription": "Your OpenAI API Key. Get it from [platform.openai.com/account/api-keys](https://platform.openai.com/account/api-keys)",
           "scope": "resource",
-          "restricted": true
+          "default": ""
         },
-        "aiChat.model": {
+        "aiChat.huggingFaceApiKey": {
           "type": "string",
-          "default": "gpt-4",
-          "enum": ["gpt-4", "gpt-4-turbo", "gpt-3.5-turbo"],
-          "description": "OpenAI model to use",
-          "scope": "resource"
+          "description": "Your Hugging Face API Token (Access Token).",
+          "markdownDescription": "Your Hugging Face API Token (Access Token). Get it from [huggingface.co/settings/tokens](https://huggingface.co/settings/tokens)",
+          "scope": "resource",
+          "default": ""
+        },
+        "aiChat.geminiApiKey": {
+          "type": "string",
+          "description": "Your Google Gemini API Key.",
+          "markdownDescription": "Your Google Gemini API Key. Get it from [aistudio.google.com/app/apikey](https://aistudio.google.com/app/apikey)",
+          "scope": "resource",
+          "default": ""
+        },
+        "aiChat.defaultModelProvider": {
+          "type": "string",
+          "enum": [
+            "openai",
+            "huggingface",
+            "gemini"
+          ],
+          "default": "openai",
+          "description": "Default AI model provider to use (OpenAI, Hugging Face, or Gemini)."
+        },
+        "aiChat.openaiModel": {
+          "type": "string",
+          "default": "gpt-3.5-turbo",
+          "description": "The OpenAI model to use (e.g., gpt-3.5-turbo, gpt-4o, gpt-4o-mini). Ensure you have access to this model."
+        },
+        "aiChat.huggingFaceModel": {
+          "type": "string",
+          "default": "mistralai/Mistral-7B-Instruct-v0.2",
+          "description": "The Hugging Face model to use (e.g., mistralai/Mistral-7B-Instruct-v0.2, google/gemma-7b-it). Ensure you have access and it's a text generation model compatible with the Inference API."
+        },
+        "aiChat.geminiModel": {
+          "type": "string",
+          "default": "gemini-pro",
+          "description": "The Google Gemini model to use (e.g., gemini-pro, gemini-1.5-pro-latest). Ensure you have access to this model."
         },
         "aiChat.maxTokens": {
           "type": "number",
           "default": 2048,
-          "minimum": 100,
-          "maximum": 4096,
-          "description": "Maximum tokens for response",
-          "scope": "resource"
+          "description": "Maximum number of tokens for AI response generation."
         }
       }
     }
   },
   "scripts": {
-    "compile": "tsc -p ./",
+    "vscode:prepublish": "node ./scripts/build.js",
+    "build": "node ./scripts/build.js",
     "watch": "tsc -watch -p ./",
-    "vscode:prepublish": "npm run compile",
-    "pretest": "npm run compile",
-    "test": "node ./out/test/runTests.js",
-    "build": "node scripts/build.js"
+    "pretest": "npm run compile && npm run lint",
+    "lint": "eslint src --ext ts",
+    "test": "node ./out/test/runTest.js"
   },
   "devDependencies": {
-    "@types/node": "^20.0.0",
-    "@types/node-fetch": "^2.6.12",
-    "@types/vscode": "^1.80.0",
-    "typescript": "^5.1.6"
+    "@types/node": "^18.19.2",
+    "@types/node-fetch": "^2.6.11",
+    "@types/react-syntax-highlighter": "^15.5.13",
+    "@types/vscode": "^1.86.0",
+    "@typescript-eslint/eslint-plugin": "^6.19.1",
+    "@typescript-eslint/parser": "^6.19.1",
+    "@vscode/test-electron": "^2.3.9",
+    "eslint": "^8.56.0",
+    "typescript": "^5.3.3"
   },
   "dependencies": {
-    "node-fetch": "^2.6.7"
+    "node-fetch": "^2.7.0"
   }
 }
